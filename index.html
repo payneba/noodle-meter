@@ -366,7 +366,79 @@
             return badges[tier];
         }
 
+        const CACHE_KEY = 'noodle_meter_cache';
+
+        function getTodayString() {
+            return new Date().toLocaleDateString('en-US');
+        }
+
+        function hasTodayData(dataArray) {
+            const today = getTodayString();
+            return dataArray.some(row => row.date === today);
+        }
+
+        function loadFromCache() {
+            try {
+                const cached = localStorage.getItem(CACHE_KEY);
+                if (!cached) return null;
+                const { data: cachedData, cachedAt } = JSON.parse(cached);
+                // Cache is valid if it was cached today and has today's data
+                if (cachedAt === getTodayString() && hasTodayData(cachedData)) {
+                    return cachedData;
+                }
+            } catch (e) {
+                console.warn('Cache read failed:', e);
+            }
+            return null;
+        }
+
+        function saveToCache(dataArray) {
+            // Only cache if we have today's data
+            if (!hasTodayData(dataArray)) {
+                console.log('Not caching - no data for today yet');
+                return;
+            }
+            try {
+                localStorage.setItem(CACHE_KEY, JSON.stringify({
+                    data: dataArray,
+                    cachedAt: getTodayString()
+                }));
+            } catch (e) {
+                console.warn('Cache write failed:', e);
+            }
+        }
+
+        function processData(dataArray) {
+            data = dataArray;
+            calculateThresholds();
+
+            // Find today's date or most recent
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            currentIndex = data.length - 1; // Default to most recent
+
+            for (let i = data.length - 1; i >= 0; i--) {
+                const entryDate = new Date(data[i].date);
+                entryDate.setHours(0, 0, 0, 0);
+                if (entryDate <= today) {
+                    currentIndex = i;
+                    break;
+                }
+            }
+
+            updateDisplay();
+        }
+
         async function fetchData() {
+            // Try cache first for instant display
+            const cachedData = loadFromCache();
+            if (cachedData) {
+                console.log('Using cached data');
+                processData(cachedData);
+                return;
+            }
+
             try {
                 const response = await fetch(DATA_URL);
                 if (!response.ok) throw new Error('Failed to fetch data');
@@ -374,35 +446,19 @@
                 const jsonData = await response.json();
 
                 // Convert date strings and ensure numeric types
-                data = jsonData.map(row => ({
+                const processedData = jsonData.map(row => ({
                     date: new Date(row.date).toLocaleDateString('en-US'),
                     revs: Number(row.revs),
                     distance: Number(row.distance)
                 }));
 
-                if (data.length === 0) {
+                if (processedData.length === 0) {
                     showError('No data found in spreadsheet');
                     return;
                 }
 
-                calculateThresholds();
-
-                // Find today's date or most recent
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-
-                currentIndex = data.length - 1; // Default to most recent
-
-                for (let i = data.length - 1; i >= 0; i--) {
-                    const entryDate = new Date(data[i].date);
-                    entryDate.setHours(0, 0, 0, 0);
-                    if (entryDate <= today) {
-                        currentIndex = i;
-                        break;
-                    }
-                }
-
-                updateDisplay();
+                saveToCache(processedData);
+                processData(processedData);
             } catch (error) {
                 showError('Could not load data. Please check that the spreadsheet is public.');
                 console.error(error);
