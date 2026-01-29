@@ -261,14 +261,7 @@
     </nav>
 
     <script>
-        const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRpXSPTM6n814tJbClEmMGI58b_cwcUePfmJtvryyrOLb94M49lXur-Aky5mAHaRHR7Q_5vgfJ8z5h1/pub?gid=0&single=true&output=csv';
-        // Try multiple CORS proxies as fallbacks
-        const CORS_PROXIES = [
-            (url) => 'https://corsproxy.io/?' + encodeURIComponent(url),
-            (url) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
-            (url) => 'https://cors-anywhere.herokuapp.com/' + url,
-        ];
-        let proxyIndex = 0;
+        const DATA_URL = 'https://script.google.com/macros/s/AKfycbxoKRMGYPQAxMCUerc8ZO2MPxJl_aeTZRwIzMYej86asddpN4IzkjgOggQMnLtKUCIzuQ/exec';
 
         let data = [];
         let currentIndex = 0;
@@ -373,32 +366,19 @@
             return badges[tier];
         }
 
-        async function fetchWithProxy(proxyIdx) {
-            const proxyUrl = CORS_PROXIES[proxyIdx](SHEET_CSV_URL);
-            const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error(`Proxy ${proxyIdx} failed with status ${response.status}`);
-            return await response.text();
-        }
-
         async function fetchData() {
-            let csvText = null;
-
-            // Try each proxy in sequence until one works
-            for (let i = 0; i < CORS_PROXIES.length; i++) {
-                try {
-                    csvText = await fetchWithProxy(i);
-                    if (csvText && csvText.includes('Date')) break; // Looks like valid CSV
-                } catch (error) {
-                    console.warn(`Proxy ${i} failed:`, error.message);
-                    if (i === CORS_PROXIES.length - 1) {
-                        showError('Could not load data. All proxies failed.');
-                        return;
-                    }
-                }
-            }
-
             try {
-                data = parseCSV(csvText);
+                const response = await fetch(DATA_URL);
+                if (!response.ok) throw new Error('Failed to fetch data');
+
+                const jsonData = await response.json();
+
+                // Convert date strings and ensure numeric types
+                data = jsonData.map(row => ({
+                    date: new Date(row.date).toLocaleDateString('en-US'),
+                    revs: Number(row.revs),
+                    distance: Number(row.distance)
+                }));
 
                 if (data.length === 0) {
                     showError('No data found in spreadsheet');
@@ -427,34 +407,6 @@
                 showError('Could not load data. Please check that the spreadsheet is public.');
                 console.error(error);
             }
-        }
-
-        function parseCSV(csvText) {
-            const lines = csvText.trim().split('\n');
-            const result = [];
-
-            // Skip header row
-            for (let i = 1; i < lines.length; i++) {
-                const line = lines[i];
-                // Handle potential quoted fields
-                const parts = line.split(',');
-
-                if (parts.length >= 3) {
-                    const dateStr = parts[0].replace(/"/g, '').trim();
-                    const revs = parseInt(parts[1].replace(/"/g, '').trim(), 10);
-                    const distance = parseFloat(parts[2].replace(/"/g, '').trim());
-
-                    if (dateStr && !isNaN(revs) && !isNaN(distance)) {
-                        result.push({
-                            date: dateStr,
-                            revs: revs,
-                            distance: distance
-                        });
-                    }
-                }
-            }
-
-            return result;
         }
 
         function formatDate(dateStr) {
