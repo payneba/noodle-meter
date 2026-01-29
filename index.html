@@ -262,8 +262,13 @@
 
     <script>
         const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRpXSPTM6n814tJbClEmMGI58b_cwcUePfmJtvryyrOLb94M49lXur-Aky5mAHaRHR7Q_5vgfJ8z5h1/pub?gid=0&single=true&output=csv';
-        // Use corsproxy.io to bypass CORS restrictions
-        const CSV_URL = 'https://corsproxy.io/?' + encodeURIComponent(SHEET_CSV_URL);
+        // Try multiple CORS proxies as fallbacks
+        const CORS_PROXIES = [
+            (url) => 'https://corsproxy.io/?' + encodeURIComponent(url),
+            (url) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+            (url) => 'https://cors-anywhere.herokuapp.com/' + url,
+        ];
+        let proxyIndex = 0;
 
         let data = [];
         let currentIndex = 0;
@@ -368,12 +373,31 @@
             return badges[tier];
         }
 
-        async function fetchData() {
-            try {
-                const response = await fetch(CSV_URL);
-                if (!response.ok) throw new Error('Failed to fetch data');
+        async function fetchWithProxy(proxyIdx) {
+            const proxyUrl = CORS_PROXIES[proxyIdx](SHEET_CSV_URL);
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error(`Proxy ${proxyIdx} failed with status ${response.status}`);
+            return await response.text();
+        }
 
-                const csvText = await response.text();
+        async function fetchData() {
+            let csvText = null;
+
+            // Try each proxy in sequence until one works
+            for (let i = 0; i < CORS_PROXIES.length; i++) {
+                try {
+                    csvText = await fetchWithProxy(i);
+                    if (csvText && csvText.includes('Date')) break; // Looks like valid CSV
+                } catch (error) {
+                    console.warn(`Proxy ${i} failed:`, error.message);
+                    if (i === CORS_PROXIES.length - 1) {
+                        showError('Could not load data. All proxies failed.');
+                        return;
+                    }
+                }
+            }
+
+            try {
                 data = parseCSV(csvText);
 
                 if (data.length === 0) {
