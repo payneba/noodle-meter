@@ -216,14 +216,38 @@
             transform: scale(0.95);
         }
 
-        .loading, .error {
-            font-size: 1.2rem;
-            color: #666;
+        .loading {
             margin-top: 50px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: conic-gradient(
+                #f39c12 0deg 45deg,
+                #e0e0e0 45deg 90deg,
+                #f39c12 90deg 135deg,
+                #e0e0e0 135deg 180deg,
+                #f39c12 180deg 225deg,
+                #e0e0e0 225deg 270deg,
+                #f39c12 270deg 315deg,
+                #e0e0e0 315deg 360deg
+            );
+            animation: spin 1s linear infinite;
+            box-shadow: inset 0 0 0 8px #fff, inset 0 0 0 10px #ccc, 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         .error {
+            font-size: 1.2rem;
             color: #c0392b;
+            margin-top: 50px;
         }
 
         .revs {
@@ -251,7 +275,9 @@
         <img src="noodle_cropped.jpg" alt="Noodle the hamster" class="hamster-image">
 
         <div id="content">
-            <div class="loading">Loading...</div>
+            <div class="loading">
+                <div class="spinner"></div>
+            </div>
         </div>
     </div>
 
@@ -526,6 +552,14 @@
             } else if (e.key === 'ArrowRight' && currentIndex < data.length - 1) {
                 currentIndex++;
                 updateDisplay();
+            }
+
+            // Ctrl+Shift+R: Clear cache and reload
+            if (e.ctrlKey && e.shiftKey && e.key === 'R') {
+                e.preventDefault();
+                localStorage.removeItem(CACHE_KEY);
+                console.log('Cache cleared');
+                location.reload();
             }
         });
 
