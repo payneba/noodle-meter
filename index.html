@@ -296,7 +296,7 @@
         .total-miles {
             font-size: 2.5rem;
             font-weight: 800;
-            color: #3498db;
+            color: #2c3e50;
             margin-bottom: 5px;
         }
 
@@ -319,14 +319,22 @@
         .histogram-bar {
             flex: 1;
             max-width: 40px;
-            background: linear-gradient(to top, #3498db, #5dade2);
             border-radius: 4px 4px 0 0;
             min-height: 4px;
             transition: all 0.3s ease;
         }
 
-        .histogram-bar:hover {
-            background: linear-gradient(to top, #2980b9, #3498db);
+        .histogram-bar.tier-low {
+            background: linear-gradient(to top, #5dade2, #85c1e9);
+        }
+        .histogram-bar.tier-medium {
+            background: linear-gradient(to top, #58d68d, #82e0aa);
+        }
+        .histogram-bar.tier-high {
+            background: linear-gradient(to top, #f39c12, #f5b041);
+        }
+        .histogram-bar.tier-record {
+            background: linear-gradient(to top, #e74c3c, #ec7063);
         }
 
         .histogram-labels {
@@ -342,6 +350,12 @@
             flex: 1;
             max-width: 40px;
             text-align: center;
+        }
+
+        .histogram-title {
+            font-size: 0.85rem;
+            color: #888;
+            margin-top: 8px;
         }
 
         .stats-summary {
@@ -688,8 +702,16 @@
             const avgMiles = totalMiles / data.length;
             const maxMiles = Math.max(...data.map(d => d.distance));
 
-            // Create histogram buckets (0-2, 3-4, 5-6, etc.)
-            const bucketSize = 2;
+            // Get tier for a bucket based on its midpoint
+            function getBucketTier(bucketMid) {
+                if (bucketMid >= thresholds.max) return 'record';
+                if (bucketMid > thresholds.p75) return 'high';
+                if (bucketMid >= thresholds.p25) return 'medium';
+                return 'low';
+            }
+
+            // Create histogram buckets (1-mile each)
+            const bucketSize = 1;
             const minMiles = Math.min(...data.map(d => d.distance));
             const minBucket = Math.floor(minMiles / bucketSize) * bucketSize;
             const maxBucket = Math.ceil(maxMiles / bucketSize) * bucketSize;
@@ -709,11 +731,13 @@
 
             const histogramBars = buckets.map(b => {
                 const height = maxCount > 0 ? (b.count / maxCount) * 100 : 0;
-                return `<div class="histogram-bar" style="height: ${height}%" title="${b.min}-${b.max - 1} mi: ${b.count} days"></div>`;
+                const bucketMid = (b.min + b.max) / 2;
+                const tier = getBucketTier(bucketMid);
+                return `<div class="histogram-bar tier-${tier}" style="height: ${height}%" title="${b.min}-${b.max} mi: ${b.count} days"></div>`;
             }).join('');
 
             const histogramLabels = buckets.map(b => {
-                return `<div class="histogram-label">${b.min}-${b.max - 1}</div>`;
+                return `<div class="histogram-label">${b.min}</div>`;
             }).join('');
 
             document.getElementById('content').innerHTML = `
@@ -724,6 +748,7 @@
 
                     <div class="histogram">${histogramBars}</div>
                     <div class="histogram-labels">${histogramLabels}</div>
+                    <div class="histogram-title">miles per day</div>
 
                     <div class="stats-summary">
                         <div class="stat-item">
