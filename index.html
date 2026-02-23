@@ -407,6 +407,73 @@
             margin-top: 4px;
         }
 
+        /* Activity grid (GitHub-style) */
+        .activity-grid {
+            margin-top: 20px;
+            overflow-x: auto;
+            padding: 0 10px;
+        }
+
+        .activity-grid-title {
+            font-size: 0.85rem;
+            color: #888;
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        .activity-grid-inner {
+            display: inline-grid;
+            grid-template-rows: auto repeat(7, 11px);
+            gap: 3px;
+        }
+
+        .activity-month-label {
+            font-size: 0.6rem;
+            color: #888;
+        }
+
+        .activity-dow-label {
+            font-size: 0.6rem;
+            color: #888;
+            text-align: right;
+            padding-right: 4px;
+            line-height: 11px;
+        }
+
+        .activity-cell {
+            width: 11px;
+            height: 11px;
+            border-radius: 2px;
+            background: #ebedf0;
+            position: relative;
+            cursor: default;
+        }
+
+        .activity-cell.tier-low { background: #5dade2; }
+        .activity-cell.tier-medium { background: #58d68d; }
+        .activity-cell.tier-high { background: #f39c12; }
+        .activity-cell.tier-record { background: #e74c3c; }
+
+        .activity-cell .activity-tooltip {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #24292e;
+            color: #fff;
+            font-size: 0.65rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            white-space: nowrap;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .activity-cell:hover .activity-tooltip {
+            display: block;
+        }
+
         @media (max-width: 480px) {
             .distance {
                 font-size: 3rem;
@@ -717,6 +784,101 @@
             }
         });
 
+        // Activity grid (GitHub-style contribution graph)
+        function buildActivityGrid() {
+            if (data.length === 0) return '';
+
+            // Build date→entry lookup (date key format: YYYY-MM-DD)
+            const dateMap = {};
+            data.forEach(d => {
+                const dt = new Date(d.date);
+                const key = dt.getFullYear() + '-' +
+                    String(dt.getMonth() + 1).padStart(2, '0') + '-' +
+                    String(dt.getDate()).padStart(2, '0');
+                dateMap[key] = d;
+            });
+
+            // Determine date range: Monday on or before first entry through Sunday on or after today/last entry
+            const firstDate = new Date(data[0].date);
+            const lastDate = new Date(data[data.length - 1].date);
+            const today = new Date();
+            const endRef = lastDate > today ? lastDate : today;
+
+            // Start on Monday on or before firstDate (JS: 0=Sun, 1=Mon)
+            const start = new Date(firstDate);
+            const startDay = start.getDay();
+            const mondayOffset = startDay === 0 ? 6 : startDay - 1;
+            start.setDate(start.getDate() - mondayOffset);
+            start.setHours(0, 0, 0, 0);
+
+            // End on Sunday on or after endRef
+            const end = new Date(endRef);
+            const endDay = end.getDay();
+            const sundayOffset = endDay === 0 ? 0 : 7 - endDay;
+            end.setDate(end.getDate() + sundayOffset);
+            end.setHours(0, 0, 0, 0);
+
+            // Generate cells day by day
+            const cells = [];
+            const monthPositions = []; // {month, col}
+            let prevMonth = -1;
+            const cursor = new Date(start);
+            let col = 0;
+
+            while (cursor <= end) {
+                const row = (cursor.getDay() + 6) % 7; // Mon=0 ... Sun=6
+                if (row === 0 && cursor > start) col++;
+
+                const m = cursor.getMonth();
+                if (m !== prevMonth) {
+                    monthPositions.push({ month: m, col: col });
+                    prevMonth = m;
+                }
+
+                const key = cursor.getFullYear() + '-' +
+                    String(cursor.getMonth() + 1).padStart(2, '0') + '-' +
+                    String(cursor.getDate()).padStart(2, '0');
+                const entry = dateMap[key];
+
+                const dateLabel = cursor.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                let tierClass = '';
+                let tooltipText = `${dateLabel}: no data`;
+                if (entry) {
+                    tierClass = ' tier-' + getTier(entry.distance);
+                    tooltipText = `${dateLabel}: ${entry.distance.toFixed(2)} mi`;
+                }
+
+                // row+2: row 1 is month labels; col+2: col 1 is DOW labels
+                cells.push(`<div class="activity-cell${tierClass}" style="grid-row:${row + 2};grid-column:${col + 2}"><span class="activity-tooltip">${tooltipText}</span></div>`);
+
+                cursor.setDate(cursor.getDate() + 1);
+            }
+
+            const totalCols = col + 1;
+
+            // Month labels in row 1, positioned at the week column where each month starts
+            const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const monthLabelsHtml = monthPositions.map(mp =>
+                `<div class="activity-month-label" style="grid-row:1;grid-column:${mp.col + 2}">${monthNames[mp.month]}</div>`
+            ).join('');
+
+            // DOW labels in column 1
+            const dowNames = ['Mon','','Wed','','Fri','',''];
+            const dowHtml = dowNames.map((name, i) =>
+                name ? `<div class="activity-dow-label" style="grid-row:${i + 2};grid-column:1">${name}</div>` : ''
+            ).join('');
+
+            return `
+                <div class="activity-grid">
+                    <div class="activity-grid-inner" style="grid-template-columns:auto repeat(${totalCols},11px)">
+                        ${monthLabelsHtml}
+                        ${dowHtml}
+                        ${cells.join('')}
+                    </div>
+                    <div class="activity-grid-title">daily activity</div>
+                </div>`;
+        }
+
         // Stats view functions
         function showStatsView() {
             currentView = 'stats';
@@ -779,6 +941,8 @@
                     <div class="histogram">${histogramBars}</div>
                     <div class="histogram-labels">${histogramLabels}</div>
                     <div class="histogram-title">miles per day</div>
+
+                    ${buildActivityGrid()}
 
                     <div class="stats-summary">
                         <div class="stat-item">
