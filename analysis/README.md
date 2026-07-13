@@ -13,6 +13,15 @@ re-run the script for current numbers.
 C:/Python314/python.exe analysis/photoperiod_model.py     # needs numpy
 ```
 
+It prints the full analysis to the console and writes **[`report.html`](report.html)** —
+a self-contained interactive report (no CDN, no build step, works offline, dark-mode
+aware). Every figure in the report is interpolated from the computed results, so the
+charts can never drift out of step with the numbers. It's also served by GitHub Pages
+at `/noodle-meter/analysis/report.html`.
+
+The checked-in `report.html` is a build artifact — regenerate it rather than editing
+it by hand.
+
 ## The hypothesis
 
 Noodle is nocturnal. She starts running when the lights go out and stops around
