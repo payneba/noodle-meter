@@ -589,6 +589,15 @@
             return sorted[lower] + (sorted[upper] - sorted[lower]) * (index - lower);
         }
 
+        // Noodle runs from lights-out to sunrise, so a summer night gives her ~2 fewer
+        // hours of wheel time than a winter one. Grading against all-time thresholds
+        // therefore just measures the season: every summer night scores "low" and the
+        // record can never be beaten until winter. Grade against recent form instead --
+        // the window slides with the daylight, so a good night reads as good year-round.
+        const TIER_WINDOW_DAYS = 30;
+        const HISTOGRAM_WINDOW_DAYS = 90;
+        const MIN_WINDOW_SAMPLES = 10;
+
         function calculateThresholds() {
             const distances = data.map(d => d.distance);
             thresholds.p25 = calculatePercentile(distances, 25);
@@ -596,21 +605,61 @@
             thresholds.max = Math.max(...distances);
         }
 
-        function getTier(distance) {
-            if (distance === thresholds.max) return 'record';
-            if (distance > thresholds.p75) return 'high';
-            if (distance >= thresholds.p25) return 'medium';
-            return 'low';
+        function windowThresholds(distances) {
+            return {
+                p25: calculatePercentile(distances, 25),
+                p75: calculatePercentile(distances, 75),
+                max: Math.max(...distances)
+            };
         }
 
-        function getBadge(tier, distance) {
+        // Entries from the N days immediately before entry i (excludes i itself).
+        function trailingDistances(i, days) {
+            const cutoff = new Date(data[i].date);
+            cutoff.setDate(cutoff.getDate() - days);
+            const out = [];
+            for (let j = i - 1; j >= 0; j--) {
+                if (new Date(data[j].date) < cutoff) break;
+                out.push(data[j].distance);
+            }
+            return out;
+        }
+
+        // Assigns entry.tier and entry.windowBest once, up front.
+        function computeTiers() {
+            const allTimeMax = Math.max(...data.map(d => d.distance));
+            data.forEach((entry, i) => {
+                const past = trailingDistances(i, TIER_WINDOW_DAYS);
+                // Not enough history behind this night to judge recent form; fall back
+                // to all-time thresholds so the earliest entries still get a tier.
+                const t = past.length >= MIN_WINDOW_SAMPLES
+                    ? windowThresholds(past)
+                    : thresholds;
+
+                entry.windowBest = past.length >= MIN_WINDOW_SAMPLES && entry.distance > t.max;
+
+                if (entry.distance >= allTimeMax) entry.tier = 'record';
+                else if (entry.distance > t.p75) entry.tier = 'high';
+                else if (entry.distance >= t.p25) entry.tier = 'medium';
+                else entry.tier = 'low';
+            });
+        }
+
+        function getTier(entry) {
+            return entry.tier;
+        }
+
+        function getBadge(entry) {
+            if (entry.tier === 'record') return { text: 'New Record!', class: 'badge-record' };
+            if (entry.tier === 'high' && entry.windowBest) {
+                return { text: 'Best in a Month!', class: 'badge-high' };
+            }
             const badges = {
-                record: { text: 'New Record!', class: 'badge-record' },
                 high: { text: 'Speed Demon!', class: 'badge-high' },
                 medium: { text: 'Steady Runner', class: 'badge-medium' },
                 low: { text: 'Rest Day', class: 'badge-low' }
             };
-            return badges[tier];
+            return badges[entry.tier];
         }
 
         const CACHE_KEY = 'noodle_meter_cache';
@@ -658,6 +707,7 @@
         function processData(dataArray) {
             data = dataArray;
             calculateThresholds();
+            computeTiers();
 
             // Find today's date or most recent
             const today = new Date();
@@ -721,8 +771,8 @@
         function updateDisplay(animate = true) {
             const entry = data[currentIndex];
             const content = document.getElementById('content');
-            const tier = getTier(entry.distance);
-            const badge = getBadge(tier);
+            const tier = getTier(entry);
+            const badge = getBadge(entry);
 
             content.innerHTML = `
                 <div class="date">${formatDate(entry.date)}</div>
@@ -844,7 +894,7 @@
                 let tierClass = '';
                 let tooltipText = `${dateLabel}: no data`;
                 if (entry) {
-                    tierClass = ' tier-' + getTier(entry.distance);
+                    tierClass = ' tier-' + getTier(entry);
                     tooltipText = `${dateLabel}: ${entry.distance.toFixed(2)} mi`;
                 }
 
@@ -890,25 +940,35 @@
             const avgMiles = totalMiles / data.length;
             const maxMiles = Math.max(...data.map(d => d.distance));
 
-            // Get tier for a bucket based on its midpoint
+            // Only histogram the recent window. Pooling every night since January mixes
+            // long winter nights with short summer ones -- two populations ~4 miles apart --
+            // which smears the distribution into a shapeless lump.
+            const histCutoff = new Date(data[data.length - 1].date);
+            histCutoff.setDate(histCutoff.getDate() - HISTOGRAM_WINDOW_DAYS);
+            const recent = data.filter(d => new Date(d.date) >= histCutoff);
+            const histData = recent.length >= MIN_WINDOW_SAMPLES ? recent : data;
+            const histThresholds = windowThresholds(histData.map(d => d.distance));
+
+            // Bucket colours are judged against the same window, but red stays reserved for
+            // the all-time record -- so it only shows if the record day falls inside the window.
             function getBucketTier(bucketMid) {
                 if (bucketMid >= thresholds.max) return 'record';
-                if (bucketMid > thresholds.p75) return 'high';
-                if (bucketMid >= thresholds.p25) return 'medium';
+                if (bucketMid > histThresholds.p75) return 'high';
+                if (bucketMid >= histThresholds.p25) return 'medium';
                 return 'low';
             }
 
             // Create histogram buckets (1-mile each)
             const bucketSize = 1;
-            const minMiles = Math.min(...data.map(d => d.distance));
+            const minMiles = Math.min(...histData.map(d => d.distance));
             const minBucket = Math.floor(minMiles / bucketSize) * bucketSize;
-            const maxBucket = Math.ceil(maxMiles / bucketSize) * bucketSize;
+            const maxBucket = Math.ceil(histThresholds.max / bucketSize) * bucketSize;
             const buckets = [];
             for (let i = minBucket; i < maxBucket; i += bucketSize) {
                 buckets.push({ min: i, max: i + bucketSize, count: 0 });
             }
 
-            data.forEach(d => {
+            histData.forEach(d => {
                 const bucketIndex = Math.floor(d.distance / bucketSize) - Math.floor(minBucket / bucketSize);
                 if (bucketIndex >= 0 && bucketIndex < buckets.length) {
                     buckets[bucketIndex].count++;
@@ -940,7 +1000,7 @@
 
                     <div class="histogram">${histogramBars}</div>
                     <div class="histogram-labels">${histogramLabels}</div>
-                    <div class="histogram-title">miles per day</div>
+                    <div class="histogram-title">miles per day &middot; last ${histData.length} days</div>
 
                     ${buildActivityGrid()}
 

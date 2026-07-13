@@ -82,14 +82,44 @@ After deploying, copy the web app URL to `index.html` (the `DATA_URL` constant).
 
 ## Features
 
-### Visual Tiers (based on percentiles)
+### Visual Tiers (based on recent form)
+
+Tiers are graded against the **trailing 30 days** (`TIER_WINDOW_DAYS`), not all-time.
 
 | Tier | Condition | Color | Effects |
 |------|-----------|-------|---------|
-| Low | Below 25th percentile | Blue | Smaller text |
-| Medium | 25th-75th percentile | Green | Normal text |
-| High | Above 75th percentile | Orange | Larger text, glow |
-| Record | Highest ever | Red | Largest text, pulse animation, confetti |
+| Low | Below 25th percentile of last 30 days | Blue | Smaller text |
+| Medium | 25th-75th percentile of last 30 days | Green | Normal text |
+| High | Above 75th percentile of last 30 days | Orange | Larger text, glow |
+| Record | Highest ever (all-time) | Red | Largest text, pulse animation, confetti |
+
+A "High" night that also beats every night in the trailing window earns the
+**Best in a Month!** badge.
+
+#### Why a trailing window, not all-time percentiles
+
+Noodle runs at night, from lights-out to sunrise. In Andover MA the dark window
+runs ~9.1h in January but only ~7.1h at the summer solstice, and she does roughly
+4,500 revolutions per hour of darkness — so a summer night yields ~9,000 fewer revs
+than a winter one for no reason other than the calendar.
+
+Grading against all-time percentiles therefore measured the season, not the hamster:
+by June/July **0%** of nights could reach the "High" tier, 60% were stuck at "Low",
+and the all-time Record was unbeatable until winter. The trailing window slides with
+the daylight, so a good night reads as good year-round (Jun/Jul went from 0 to 7
+celebration nights on the same data). Record stays all-time — it's the rare prize,
+and it will come back into reach as the nights lengthen.
+
+Analysis note: the long-run decline in the data is almost entirely photoperiod
+(~85%); the residual "she's slowing down" trend is not statistically significant.
+
+### Histogram
+
+Scoped to the last 90 days (`HISTOGRAM_WINDOW_DAYS`) and coloured against that
+window's own thresholds. Pooling all history mixes long winter nights with short
+summer ones — two populations several miles apart — which smears the distribution
+into a shapeless lump. Red is reserved for the all-time record, so the top bucket
+only turns red if the record day falls inside the window.
 
 ### Caching
 
