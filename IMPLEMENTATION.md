@@ -112,6 +112,7 @@ and it will come back into reach as the nights lengthen.
 
 Analysis note: the long-run decline in the data is almost entirely photoperiod
 (~85%); the residual "she's slowing down" trend is not statistically significant.
+Full derivation and the script that reproduces it: [analysis/README.md](analysis/README.md).
 
 ### Histogram
 
