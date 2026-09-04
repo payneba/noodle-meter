@@ -1,5 +1,7 @@
 # Is Noodle slowing down?
 
+> **Update (2026-09-04):** The write-up below is a snapshot of 173 nights through 2026-07-13. With data through 2026-09-04 (226 nights), the residual-trend conclusion below has flipped: it is now small but statistically significant (−30 ± 5 revs/day) — most of the decline is still photoperiod (~86%), but there is now evidence of a modest genuine slowdown on top of it. See [report.html](report.html) or re-run `photoperiod_model.py` for current numbers.
+
 **Short answer: probably not.** The long-run decline in revolutions per night is
 almost entirely explained by the shrinking dark window between lights-out and
 sunrise. Once you control for it, the residual "she's getting slower" trend is
