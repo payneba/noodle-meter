@@ -731,12 +731,29 @@
             currentIndex = 0;
             document.getElementById('prev-btn').disabled = true;
             document.getElementById('next-btn').disabled = true;
+            // The previous pet may have been empty, which hides both sets of
+            // controls; restore them for the incoming pet. Navigation follows the
+            // view we're staying in, since the stats view has no day to page to.
+            document.getElementById('view-toggle').style.display = '';
+            document.getElementById('navigation').style.display =
+                currentView === 'stats' ? 'none' : 'flex';
             document.getElementById('content').innerHTML =
                 '<div class="loading"><div class="spinner"></div></div>';
             fetchData();
         }
 
+        // A pet with no submissions has no day to display and nothing to chart, so
+        // hide both the arrows and the stats toggle rather than leave controls that
+        // would run over an empty array. Force the home view too: an empty pet
+        // reached from the stats view would otherwise leave currentView === 'stats'
+        // and route the next toggle click into showStatsView with no data.
         function showEmptyState() {
+            currentView = 'home';
+            document.getElementById('navigation').style.display = 'none';
+            const toggle = document.getElementById('view-toggle');
+            toggle.style.display = 'none';
+            toggle.innerHTML = '&#x1F4CA;'; // Chart icon
+            toggle.title = 'Toggle stats view';
             document.getElementById('content').innerHTML = `
                 <div class="empty-state">No runs logged yet.<br>
                 <a href="${currentPet.formUrl}" target="_blank" rel="noopener">Log the first one!</a></div>
@@ -880,7 +897,9 @@
             // Ctrl+Shift+R: Clear cache and reload
             if (e.ctrlKey && e.shiftKey && e.key === 'R') {
                 e.preventDefault();
-                localStorage.removeItem(cacheKey());
+                // cacheKey() needs a pet; if pets.json failed to load there is no
+                // cache to clear, and the reload is the whole point of the shortcut.
+                if (currentPet) localStorage.removeItem(cacheKey());
                 console.log('Cache cleared');
                 location.reload();
             }
@@ -1084,6 +1103,9 @@
 
         // View toggle handler
         document.getElementById('view-toggle').addEventListener('click', () => {
+            // Both views index into data; with none loaded (empty pet, or a failed
+            // fetch that leaves the toggle on screen) there is nothing to show.
+            if (data.length === 0) return;
             if (currentView === 'home') {
                 showStatsView();
             } else {
