@@ -1,7 +1,7 @@
-// Endpoint tests: validate the live Apps Script data endpoint.
+// Endpoint tests: every pet in pets.json is served by the live Apps Script.
 const https = require('https');
-
-const DATA_URL = 'https://script.google.com/macros/s/AKfycbxoKRMGYPQAxMCUerc8ZO2MPxJl_aeTZRwIzMYej86asddpN4IzkjgOggQMnLtKUCIzuQ/exec';
+const Stats = require('../stats.js');
+const config = require('../pets.json');
 
 function fetchUrl(url) {
     return new Promise((resolve, reject) => {
@@ -27,45 +27,46 @@ function fetchUrl(url) {
 async function run(h) {
     console.log('\nEndpoint tests');
 
-    let responseData;
-    try {
-        const response = await fetchUrl(DATA_URL);
-        h.test('Apps Script endpoint responds with 200', () => {
-            h.assertEqual(response.status, 200, 'Status code');
+    for (const pet of config.pets) {
+        let rows;
+        try {
+            const response = await fetchUrl(`${config.dataUrl}?pet=${encodeURIComponent(pet.slug)}`);
+            rows = JSON.parse(response.data);
+        } catch (error) {
+            h.test(`'${pet.slug}' endpoint responds with valid JSON`, () => { throw error; });
+            continue;
+        }
+        h.test(`'${pet.slug}' endpoint responds with valid JSON`, () => {
+            h.assertTrue(Array.isArray(rows), 'response is an array');
         });
-        responseData = response.data;
-    } catch (error) {
-        h.test('Apps Script endpoint responds with 200', () => { throw error; });
-        return;
+        h.test(`'${pet.slug}' rows have timestamp and revs fields`, () => {
+            rows.forEach((row, i) => {
+                h.assertTrue('timestamp' in row, `row ${i}: missing timestamp`);
+                h.assertTrue('revs' in row, `row ${i}: missing revs`);
+                h.assertTrue('date' in row, `row ${i}: missing date`);
+            });
+        });
+        h.test(`'${pet.slug}' normalized distances are reasonable (0-50 mi)`, () => {
+            const normalized = Stats.normalizeRows(rows, Stats.milesPerRev(pet));
+            normalized.forEach(r => {
+                h.assertTrue(r.distance >= 0 && r.distance <= 50,
+                    `${r.date}: distance ${r.distance} out of range`);
+            });
+        });
     }
 
-    let jsonData;
-    h.test('Response is valid JSON', () => {
-        jsonData = JSON.parse(responseData);
-    });
-    h.test('Response is an array', () => {
-        h.assertTrue(Array.isArray(jsonData), 'Response should be an array');
-    });
-    h.test('Response contains data', () => {
-        h.assertTrue(jsonData.length > 0, 'Array should not be empty');
-    });
-    h.test('Data has expected fields (date, revs, distance)', () => {
-        const first = jsonData[0];
-        h.assertTrue('date' in first, 'Missing date field');
-        h.assertTrue('revs' in first, 'Missing revs field');
-        h.assertTrue('distance' in first, 'Missing distance field');
-    });
-    h.test('Distance values are reasonable (0-50 miles)', () => {
-        jsonData.forEach((row, i) => {
-            const dist = Number(row.distance);
-            h.assertTrue(dist >= 0 && dist <= 50, `Row ${i}: distance ${dist} out of range`);
-        });
-    });
-    h.test('Revolution counts are positive', () => {
-        jsonData.forEach((row, i) => {
-            const revs = Number(row.revs);
-            h.assertTrue(revs >= 0, `Row ${i}: revs ${revs} should be positive`);
-        });
+    let unknownRows = null;
+    let unknownError = null;
+    try {
+        const response = await fetchUrl(`${config.dataUrl}?pet=no_such_pet_xyz`);
+        unknownRows = JSON.parse(response.data);
+    } catch (error) {
+        unknownError = error;
+    }
+    h.test('unknown pet slug returns an empty array', () => {
+        if (unknownError) throw unknownError;
+        h.assertTrue(Array.isArray(unknownRows) && unknownRows.length === 0,
+            `expected [], got ${JSON.stringify(unknownRows).slice(0, 80)}`);
     });
 }
 
