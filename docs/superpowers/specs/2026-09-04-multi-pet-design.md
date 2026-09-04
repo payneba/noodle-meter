@@ -71,8 +71,12 @@ One deployment. `doGet(e)`:
 ### Client normalization (replaces the sheet's distance formula)
 
 1. Effective date = date-override || timestamp's date.
-2. Deduplicate by effective date, **last submission wins** (resubmitting
-   corrects a typo).
+2. Deduplicate by effective date, **latest timestamp wins** (resubmitting
+   corrects a typo). Timestamp order, not sheet-row order: a linked form
+   inserts each response directly below the last form-written row — above
+   any manually pasted backfill — so row position carries no submission
+   ordering. Ties (identical timestamps, e.g. within backfill) keep sheet
+   order via stable sort.
 3. Sort ascending by date.
 4. `distance = revs × milesPerRev` from the pet's config.
 
