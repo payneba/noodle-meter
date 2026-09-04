@@ -74,6 +74,11 @@ async function run(h) {
             0.5, 'override');
     });
 
+    h.test('milesPerRev honors explicit zero override', () => {
+        h.assertEqual(Stats.milesPerRev({ wheelDiameterInches: 9, milesPerRev: 0 }),
+            0, 'explicit zero is a real override, not "unset"');
+    });
+
     h.test('normalizeRows computes distance from revs', () => {
         const out = Stats.normalizeRows(
             [{ timestamp: '2026-01-05T14:00:00Z', revs: 1000, date: '' }], 0.001);
@@ -87,6 +92,20 @@ async function run(h) {
         const out = Stats.normalizeRows(
             [{ timestamp: '2026-01-05T14:00:00Z', revs: 500, date: '1/3/2026' }], 0.001);
         h.assertEqual(out[0].date, '1/3/2026', 'override used');
+    });
+
+    h.test('normalizeRows treats date-only ISO override as a calendar date', () => {
+        const out = Stats.normalizeRows(
+            [{ timestamp: '2026-01-05T14:00:00Z', revs: 500, date: '2026-01-03' }], 0.001);
+        h.assertEqual(out[0].date, new Date(2026, 0, 3).toLocaleDateString('en-US'),
+            'no timezone shift for date-only ISO override');
+    });
+
+    h.test('normalizeRows treats Apps Script Date-cell override as a calendar date', () => {
+        const out = Stats.normalizeRows(
+            [{ timestamp: '2026-01-05T14:00:00Z', revs: 500, date: '2026-01-03T05:00:00.000Z' }], 0.001);
+        h.assertEqual(out[0].date, new Date(2026, 0, 3).toLocaleDateString('en-US'),
+            'no timezone shift for UTC-midnight-Eastern override timestamp');
     });
 
     h.test('normalizeRows dedupes by date, last submission wins', () => {

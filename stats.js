@@ -72,9 +72,13 @@
     // Distance per wheel revolution for a pet: explicit calibration override,
     // else derived from the wheel diameter (63360 inches per mile).
     function milesPerRev(pet) {
-        if (pet.milesPerRev) return pet.milesPerRev;
+        if (pet.milesPerRev != null) return pet.milesPerRev;
         return Math.PI * pet.wheelDiameterInches / 63360;
     }
+
+    // An ISO-style Y-M-D prefix, e.g. "2026-01-03" or the "2026-01-03T05:00:00.000Z"
+    // that Google Apps Script emits for Date-question cells.
+    const ISO_DATE_PREFIX = /^(\d{4})-(\d{2})-(\d{2})/;
 
     // Raw endpoint rows {timestamp, revs, date} -> [{date, revs, distance}].
     // The recorded date is the morning the wheel was read (the submission's
@@ -85,8 +89,17 @@
         rows.forEach(row => {
             const revs = Number(row.revs);
             if (row.revs === '' || row.revs === null || !isFinite(revs)) return;
-            const raw = row.date ? row.date : row.timestamp;
-            const d = new Date(raw);
+            let d;
+            if (row.date) {
+                // The override is a calendar date, not a moment in time. An ISO
+                // Y-M-D (or Y-M-D-prefixed timestamp) must not shift with the
+                // viewer's timezone, so build it from local date components
+                // instead of letting new Date() parse it as UTC.
+                const m = ISO_DATE_PREFIX.exec(row.date);
+                d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(row.date);
+            } else {
+                d = new Date(row.timestamp);
+            }
             if (isNaN(d.getTime())) return;
             const key = d.toLocaleDateString('en-US');
             byDate.set(key, { date: key, revs: revs, distance: revs * perRev });
