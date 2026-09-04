@@ -21,11 +21,14 @@ Noodle's nightly mileage has been falling since January — mostly, but not enti
 because of daylight. She runs from lights-out to sunrise, and that window shrinks by
 ~2 hours between January and the summer solstice. With data through early September,
 that shrinking dark window accounts for roughly 86% of the decline — but the leftover
-trend is now small and statistically significant: about −30 revs/day on top of the
-photoperiod effect. Most of the "slowdown" is the season; there's now evidence of a
-modest genuine slowdown underneath it too.
+trend is now small and statistically significant: about −30 ± 5 revs/day on top of
+the photoperiod effect. Most of the "slowdown" is the season; there's now evidence of
+a modest genuine slowdown underneath it too.
 
 See [analysis/README.md](analysis/README.md) for the full write-up (Noodle-specific;
 it predates multi-pet support), and `analysis/photoperiod_model.py` to re-derive it
-from live data. This is also why the app grades each night against the trailing 30
-days rather than against all-time percentiles.
+from live data. **Note:** that write-up is a snapshot through 2026-07-13 (173 nights)
+and predates this update — with data through 2026-09-04 the residual-trend conclusion
+flipped from not-significant to significant (see above); re-run
+`photoperiod_model.py` for current numbers. This is also why the app grades each
+night against the trailing 30 days rather than against all-time percentiles.

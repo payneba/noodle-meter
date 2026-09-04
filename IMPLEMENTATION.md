@@ -218,9 +218,13 @@ and it will come back into reach as the nights lengthen.
 
 Analysis note: with data through early September, the long-run decline is mostly
 photoperiod (~86%), but the residual "she's slowing down" trend is now small and
-statistically significant (~−30 revs/day) on top of it. This tiering rationale — grade
-against recent form, not the season — is unaffected either way.
+statistically significant (−30 ± 5 revs/day) on top of it. This tiering rationale —
+grade against recent form, not the season — is unaffected either way.
 Full derivation and the script that reproduces it: [analysis/README.md](analysis/README.md).
+**Note:** that write-up is a snapshot through 2026-07-13 (173 nights) and predates
+this update — with data through 2026-09-04 the residual-trend conclusion flipped
+from not-significant to significant (see above); re-run
+`analysis/photoperiod_model.py` for current numbers.
 
 ### Histogram
 
