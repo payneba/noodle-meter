@@ -134,6 +134,27 @@ async function run(h) {
         ], 1);
         h.assertEqual(out.length, 1, 'only the valid row survives');
     });
+
+    h.test('normalizeRows dedup ignores sheet order, uses latest timestamp (form above backfill)', () => {
+        // Google Forms inserts new responses above manually pasted backfill
+        // rows, so a form-submitted correction can appear earlier in the
+        // sheet than the stale backfill row it's correcting.
+        const out = Stats.normalizeRows([
+            { timestamp: '2026-06-01T14:00:00Z', revs: 999, date: '2026-01-15' },
+            { timestamp: '2026-01-15T14:00:00Z', revs: 100, date: '' }
+        ], 0.001);
+        h.assertEqual(out.length, 1, 'deduped to one entry for 1/15/2026');
+        h.assertEqual(out[0].revs, 999, 'later-timestamped correction wins despite appearing first in sheet order');
+    });
+
+    h.test('normalizeRows same-day resubmit ordering is timestamp-based, not array-order-based', () => {
+        const out = Stats.normalizeRows([
+            { timestamp: '2026-01-05T16:00:00Z', revs: 200, date: '' },
+            { timestamp: '2026-01-05T14:00:00Z', revs: 100, date: '' }
+        ], 0.001);
+        h.assertEqual(out.length, 1, 'deduped');
+        h.assertEqual(out[0].revs, 200, 'later timestamp wins even though it is first in the array');
+    });
 }
 
 module.exports = { run };

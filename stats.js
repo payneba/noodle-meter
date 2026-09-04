@@ -83,10 +83,15 @@
     // Raw endpoint rows {timestamp, revs, date} -> [{date, revs, distance}].
     // The recorded date is the morning the wheel was read (the submission's
     // date) unless the optional date field overrides it. Duplicate dates keep
-    // the last submission, so resubmitting corrects a typo.
+    // the submission with the latest timestamp, not the last sheet row --
+    // Google Forms inserts new responses above manually pasted backfill rows,
+    // so sheet order doesn't reflect submission order. Sort by timestamp
+    // ascending first (a stable sort, so same-instant rows keep sheet order),
+    // then dedup by taking the last (latest-timestamped) write per date.
     function normalizeRows(rows, perRev) {
         const byDate = new Map();
-        rows.forEach(row => {
+        const byTimestamp = [...rows].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        byTimestamp.forEach(row => {
             const revs = Number(row.revs);
             if (row.revs === '' || row.revs === null || !isFinite(revs)) return;
             let d;
