@@ -114,7 +114,7 @@ array:
 | `image` | Path to the pet's photo, under `images/` | `"images/noodle.jpg"` |
 | `wheelDiameterInches` | Wheel diameter; distance = `revs × π × diameter / 63360` | `8` |
 | `milesPerRev` | *Optional.* Overrides the diameter-derived value for an oddly calibrated pedometer | `0.00042` |
-| `formUrl` | The pet's Google Form share link ("Log this morning's count") | `https://forms.gle/…` |
+| `formUrl` | The pet's Google Form share link (shown in the empty state; owners bookmark it directly) | `https://forms.gle/…` |
 
 `milesPerRev` beats `wheelDiameterInches` when both are present — set it only
 if a pet's actual distance-per-rev doesn't match a clean diameter figure.

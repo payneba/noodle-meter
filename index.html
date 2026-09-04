@@ -54,30 +54,6 @@
             transform: scale(1.05);
         }
 
-        .form-link {
-            position: absolute;
-            top: 0;
-            right: 0;
-            background: rgba(255,255,255,0.9);
-            border: none;
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            font-size: 1.2rem;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-decoration: none;
-        }
-
-        .form-link:hover {
-            background: #fff;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            transform: scale(1.05);
-        }
-
         .pet-select {
             margin: -10px auto 20px;
             display: block;
@@ -534,7 +510,6 @@
 
     <div class="container">
         <button class="view-toggle" id="view-toggle" title="Toggle stats view">&#x1F4CA;</button>
-        <a class="form-link" id="form-link" target="_blank" rel="noopener" title="Log this morning's count">&#x270F;&#xFE0F;</a>
         <h1 class="page-title" id="page-title"></h1>
         <select class="pet-select" id="pet-select"></select>
         <img src="images/noodle.jpg" alt="" class="hamster-image" id="pet-image">
@@ -724,7 +699,6 @@
             const img = document.getElementById('pet-image');
             img.src = currentPet.image;
             img.alt = currentPet.name;
-            document.getElementById('form-link').href = currentPet.formUrl;
             document.getElementById('pet-select').value = slug;
 
             data = [];
