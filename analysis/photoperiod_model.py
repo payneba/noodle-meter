@@ -117,6 +117,9 @@ def percentile_tier(value, p25, p75, mx):
 def load():
     with urllib.request.urlopen(DATA_URL) as r:
         raw = json.load(r)
+    # Skip rows with no revs before touching any date field, so a malformed or
+    # missing timestamp on a skippable row can't abort the run.
+    raw = [x for x in raw if x.get("revs") not in ("", None)]
     # Forms inserts new responses above manually pasted backfill, so row order
     # doesn't reflect submission order. Sort by timestamp first (stable) so
     # that, per effective date below, the last-submitted row wins the dict
@@ -124,8 +127,6 @@ def load():
     raw = sorted(raw, key=lambda x: datetime.fromisoformat(str(x["timestamp"]).replace("Z", "+00:00")))
     by_date = {}
     for x in raw:
-        if x.get("revs") in ("", None):
-            continue
         src = x["date"] or x["timestamp"]
         d = to_local(datetime.fromisoformat(str(src).replace("Z", "+00:00"))).date()
         by_date[d] = float(x["revs"])  # last submission wins
