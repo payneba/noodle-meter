@@ -24,8 +24,8 @@ from pathlib import Path
 
 import numpy as np
 
-DATA_URL = ("https://script.google.com/macros/s/AKfycbxoKRMGYPQAxMCUerc8ZO2MPxJl"
-            "_aeTZRwIzMYej86asddpN4IzkjgOggQMnLtKUCIzuQ/exec")
+DATA_URL = ("https://script.google.com/macros/s/AKfycbxFhLI9WpW2XGWlCp2QoySUy9Uas7Whf95ua09Tra"
+            "V49f_JHRCAIw_0RhopCHuc0vCiyg/exec?pet=noodle")
 
 LAT, LON = 42.6583, -71.1368     # Andover, MA
 LREF = 22.0                      # reference lights-out (10pm wall clock); see note below
@@ -117,11 +117,19 @@ def percentile_tier(value, p25, p75, mx):
 def load():
     with urllib.request.urlopen(DATA_URL) as r:
         raw = json.load(r)
-    rows = sorted(
-        (to_local(datetime.fromisoformat(x["date"].replace("Z", "+00:00"))).date(),
-         float(x["revs"]))
-        for x in raw if x.get("revs")
-    )
+    # Forms inserts new responses above manually pasted backfill, so row order
+    # doesn't reflect submission order. Sort by timestamp first (stable) so
+    # that, per effective date below, the last-submitted row wins the dict
+    # overwrite -- matching Stats.normalizeRows in stats.js.
+    raw = sorted(raw, key=lambda x: datetime.fromisoformat(str(x["timestamp"]).replace("Z", "+00:00")))
+    by_date = {}
+    for x in raw:
+        if x.get("revs") in ("", None):
+            continue
+        src = x["date"] or x["timestamp"]
+        d = to_local(datetime.fromisoformat(str(src).replace("Z", "+00:00"))).date()
+        by_date[d] = float(x["revs"])  # last submission wins
+    rows = sorted(by_date.items())
     return [r[0] for r in rows], np.array([r[1] for r in rows])
 
 
