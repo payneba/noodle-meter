@@ -69,6 +69,31 @@
         return allTime;
     }
 
+    // Distance per wheel revolution for a pet: explicit calibration override,
+    // else derived from the wheel diameter (63360 inches per mile).
+    function milesPerRev(pet) {
+        if (pet.milesPerRev) return pet.milesPerRev;
+        return Math.PI * pet.wheelDiameterInches / 63360;
+    }
+
+    // Raw endpoint rows {timestamp, revs, date} -> [{date, revs, distance}].
+    // The recorded date is the morning the wheel was read (the submission's
+    // date) unless the optional date field overrides it. Duplicate dates keep
+    // the last submission, so resubmitting corrects a typo.
+    function normalizeRows(rows, perRev) {
+        const byDate = new Map();
+        rows.forEach(row => {
+            const revs = Number(row.revs);
+            if (row.revs === '' || row.revs === null || !isFinite(revs)) return;
+            const raw = row.date ? row.date : row.timestamp;
+            const d = new Date(raw);
+            if (isNaN(d.getTime())) return;
+            const key = d.toLocaleDateString('en-US');
+            byDate.set(key, { date: key, revs: revs, distance: revs * perRev });
+        });
+        return [...byDate.values()].sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+
     return {
         TIER_WINDOW_DAYS,
         HISTOGRAM_WINDOW_DAYS,
@@ -76,6 +101,8 @@
         calculatePercentile,
         windowThresholds,
         trailingDistances,
-        computeTiers
+        computeTiers,
+        milesPerRev,
+        normalizeRows
     };
 }));

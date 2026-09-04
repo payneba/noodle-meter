@@ -63,6 +63,58 @@ async function run(h) {
         h.assertEqual(data[14].windowBest, true, 'beats every night in window');
         h.assertEqual(data[10].tier, 'medium', 'mid-pack night is medium');
     });
+
+    h.test('milesPerRev from wheel diameter', () => {
+        h.assertClose(Stats.milesPerRev({ wheelDiameterInches: 9 }),
+            Math.PI * 9 / 63360, 1e-12, 'diameter-derived');
+    });
+
+    h.test('milesPerRev override wins over diameter', () => {
+        h.assertEqual(Stats.milesPerRev({ wheelDiameterInches: 9, milesPerRev: 0.5 }),
+            0.5, 'override');
+    });
+
+    h.test('normalizeRows computes distance from revs', () => {
+        const out = Stats.normalizeRows(
+            [{ timestamp: '2026-01-05T14:00:00Z', revs: 1000, date: '' }], 0.001);
+        h.assertEqual(out.length, 1, 'one row');
+        h.assertEqual(out[0].date, new Date('2026-01-05T14:00:00Z').toLocaleDateString('en-US'), 'date from timestamp');
+        h.assertEqual(out[0].revs, 1000, 'revs');
+        h.assertClose(out[0].distance, 1, 1e-9, 'distance');
+    });
+
+    h.test('normalizeRows honors date override', () => {
+        const out = Stats.normalizeRows(
+            [{ timestamp: '2026-01-05T14:00:00Z', revs: 500, date: '1/3/2026' }], 0.001);
+        h.assertEqual(out[0].date, '1/3/2026', 'override used');
+    });
+
+    h.test('normalizeRows dedupes by date, last submission wins', () => {
+        const out = Stats.normalizeRows([
+            { timestamp: '2026-01-05T14:00:00Z', revs: 100, date: '' },
+            { timestamp: '2026-01-05T16:00:00Z', revs: 200, date: '' }
+        ], 0.001);
+        h.assertEqual(out.length, 1, 'deduped');
+        h.assertEqual(out[0].revs, 200, 'later submission kept');
+    });
+
+    h.test('normalizeRows sorts by date ascending', () => {
+        const out = Stats.normalizeRows([
+            { timestamp: '2026-01-06T14:00:00Z', revs: 2, date: '' },
+            { timestamp: '2026-01-04T14:00:00Z', revs: 1, date: '' }
+        ], 1);
+        h.assertEqual(out[0].revs, 1, 'earlier date first');
+        h.assertEqual(out[1].revs, 2, 'later date second');
+    });
+
+    h.test('normalizeRows skips blank and junk rows', () => {
+        const out = Stats.normalizeRows([
+            { timestamp: '2026-01-05T14:00:00Z', revs: '', date: '' },
+            { timestamp: 'not a date', revs: 100, date: '' },
+            { timestamp: '2026-01-06T14:00:00Z', revs: 100, date: '' }
+        ], 1);
+        h.assertEqual(out.length, 1, 'only the valid row survives');
+    });
 }
 
 module.exports = { run };
