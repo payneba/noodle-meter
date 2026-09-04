@@ -54,6 +54,49 @@
             transform: scale(1.05);
         }
 
+        .form-link {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: rgba(255,255,255,0.9);
+            border: none;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            font-size: 1.2rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+        }
+
+        .form-link:hover {
+            background: #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: scale(1.05);
+        }
+
+        .pet-select {
+            margin: -10px auto 20px;
+            display: block;
+            padding: 6px 12px;
+            border-radius: 16px;
+            border: 1px solid #ccc;
+            background: rgba(255,255,255,0.9);
+            font-size: 0.9rem;
+            color: #2c3e50;
+            cursor: pointer;
+        }
+
+        .empty-state {
+            font-size: 1.2rem;
+            color: #555;
+            margin-top: 50px;
+            line-height: 2;
+        }
+
         .page-title {
             font-size: 1.8rem;
             font-weight: 700;
@@ -491,8 +534,10 @@
 
     <div class="container">
         <button class="view-toggle" id="view-toggle" title="Toggle stats view">&#x1F4CA;</button>
-        <h1 class="page-title">Noodle's Running Tracker</h1>
-        <img src="images/noodle.jpg" alt="Noodle the hamster" class="hamster-image">
+        <a class="form-link" id="form-link" target="_blank" rel="noopener" title="Log this morning's count">&#x270F;&#xFE0F;</a>
+        <h1 class="page-title" id="page-title"></h1>
+        <select class="pet-select" id="pet-select"></select>
+        <img src="images/noodle.jpg" alt="" class="hamster-image" id="pet-image">
 
         <div id="content">
             <div class="loading">
@@ -508,8 +553,6 @@
 
     <script src="stats.js"></script>
     <script>
-        const DATA_URL = 'https://script.google.com/macros/s/AKfycbxoKRMGYPQAxMCUerc8ZO2MPxJl_aeTZRwIzMYej86asddpN4IzkjgOggQMnLtKUCIzuQ/exec';
-
         let data = [];
         let currentIndex = 0;
         let thresholds = { p25: 0, p75: 0, max: 0 };
@@ -598,7 +641,15 @@
             return badges[entry.tier];
         }
 
-        const CACHE_KEY = 'noodle_meter_cache';
+        const CONFIG_URL = 'pets.json';
+        const LAST_PET_KEY = 'noodle_meter_last_pet';
+
+        let config = null;
+        let currentPet = null;
+
+        function cacheKey() {
+            return `noodle_meter_cache_${currentPet.slug}`;
+        }
 
         function getTodayString() {
             return new Date().toLocaleDateString('en-US');
@@ -611,7 +662,7 @@
 
         function loadFromCache() {
             try {
-                const cached = localStorage.getItem(CACHE_KEY);
+                const cached = localStorage.getItem(cacheKey());
                 if (!cached) return null;
                 const { data: cachedData, cachedAt } = JSON.parse(cached);
                 // Cache is valid if it was cached today and has today's data
@@ -631,13 +682,65 @@
                 return;
             }
             try {
-                localStorage.setItem(CACHE_KEY, JSON.stringify({
+                localStorage.setItem(cacheKey(), JSON.stringify({
                     data: dataArray,
                     cachedAt: getTodayString()
                 }));
             } catch (e) {
                 console.warn('Cache write failed:', e);
             }
+        }
+
+        // Pet resolution order: ?pet= URL param, then the last pet viewed on this
+        // device, then the first pet in the config.
+        function resolvePetSlug() {
+            const param = new URLSearchParams(location.search).get('pet');
+            if (config.pets.some(p => p.slug === param)) return param;
+            const last = localStorage.getItem(LAST_PET_KEY);
+            if (config.pets.some(p => p.slug === last)) return last;
+            return config.pets[0].slug;
+        }
+
+        function buildPetSelect() {
+            const select = document.getElementById('pet-select');
+            if (config.pets.length < 2) {
+                select.style.display = 'none';
+                return;
+            }
+            select.innerHTML = config.pets.map(p =>
+                `<option value="${p.slug}">${p.name}</option>`).join('');
+            select.addEventListener('change', () => switchPet(select.value));
+        }
+
+        function switchPet(slug) {
+            currentPet = config.pets.find(p => p.slug === slug);
+            localStorage.setItem(LAST_PET_KEY, slug);
+            const url = new URL(location);
+            url.searchParams.set('pet', slug);
+            history.replaceState(null, '', url);
+
+            document.title = currentPet.title;
+            document.getElementById('page-title').textContent = currentPet.title;
+            const img = document.getElementById('pet-image');
+            img.src = currentPet.image;
+            img.alt = currentPet.name;
+            document.getElementById('form-link').href = currentPet.formUrl;
+            document.getElementById('pet-select').value = slug;
+
+            data = [];
+            currentIndex = 0;
+            document.getElementById('prev-btn').disabled = true;
+            document.getElementById('next-btn').disabled = true;
+            document.getElementById('content').innerHTML =
+                '<div class="loading"><div class="spinner"></div></div>';
+            fetchData();
+        }
+
+        function showEmptyState() {
+            document.getElementById('content').innerHTML = `
+                <div class="empty-state">No runs logged yet.<br>
+                <a href="${currentPet.formUrl}" target="_blank" rel="noopener">Log the first one!</a></div>
+            `;
         }
 
         function processData(dataArray) {
@@ -659,10 +762,15 @@
                 }
             }
 
-            updateDisplay();
+            if (currentView === 'stats') {
+                showStatsView();
+            } else {
+                updateDisplay();
+            }
         }
 
         async function fetchData() {
+            const slug = currentPet.slug;
             // Try cache first for instant display
             const cachedData = loadFromCache();
             if (cachedData) {
@@ -672,29 +780,38 @@
             }
 
             try {
-                const response = await fetch(DATA_URL);
+                const response = await fetch(`${config.dataUrl}?pet=${encodeURIComponent(slug)}`);
                 if (!response.ok) throw new Error('Failed to fetch data');
+                const rows = await response.json();
+                if (currentPet.slug !== slug) return; // user switched pets mid-fetch
 
-                const jsonData = await response.json();
-
-                // Convert date strings and ensure numeric types
-                const processedData = jsonData.map(row => ({
-                    date: new Date(row.date).toLocaleDateString('en-US'),
-                    revs: Number(row.revs),
-                    distance: Number(row.distance)
-                }));
-
+                const processedData = Stats.normalizeRows(rows, Stats.milesPerRev(currentPet));
                 if (processedData.length === 0) {
-                    showError('No data found in spreadsheet');
+                    showEmptyState();
                     return;
                 }
 
                 saveToCache(processedData);
                 processData(processedData);
             } catch (error) {
+                if (currentPet.slug !== slug) return;
                 showError('Could not load data. Please check that the spreadsheet is public.');
                 console.error(error);
             }
+        }
+
+        async function init() {
+            try {
+                const resp = await fetch(CONFIG_URL);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                config = await resp.json();
+            } catch (e) {
+                showError('Could not load pets.json');
+                console.error(e);
+                return;
+            }
+            buildPetSelect();
+            switchPet(resolvePetSlug());
         }
 
         function formatDate(dateStr) {
@@ -763,7 +880,7 @@
             // Ctrl+Shift+R: Clear cache and reload
             if (e.ctrlKey && e.shiftKey && e.key === 'R') {
                 e.preventDefault();
-                localStorage.removeItem(CACHE_KEY);
+                localStorage.removeItem(cacheKey());
                 console.log('Cache cleared');
                 location.reload();
             }
@@ -975,7 +1092,7 @@
         });
 
         // Initialize
-        fetchData();
+        init();
     </script>
 </body>
 </html>
