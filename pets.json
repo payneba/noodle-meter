@@ -8,6 +8,14 @@
       "image": "images/noodle.jpg",
       "wheelDiameterInches": 8,
       "formUrl": "https://forms.gle/qoZ3ewPZXzW8Fbky5"
+    },
+    {
+      "slug": "murphy",
+      "name": "Murphy",
+      "title": "Murphy's Running Tracker",
+      "image": "images/murphy.jpg",
+      "wheelDiameterInches": 8,
+      "formUrl": "https://forms.gle/j91AY45Asybaapuc7"
     }
   ]
 }
