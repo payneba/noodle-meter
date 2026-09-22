@@ -315,11 +315,30 @@
             padding: 10px 0;
         }
 
-        .stats-title {
-            font-size: 1.5rem;
-            color: #2c3e50;
+        .range-toggle {
+            display: inline-flex;
+            background: #ebedf0;
+            border-radius: 999px;
+            padding: 3px;
             margin-bottom: 20px;
+        }
+
+        .range-btn {
+            border: none;
+            background: transparent;
+            color: #666;
+            font-size: 0.85rem;
+            padding: 6px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .range-btn.active {
+            background: #fff;
+            color: #2c3e50;
             font-weight: 600;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.12);
         }
 
         .total-miles {
@@ -532,6 +551,8 @@
         let currentIndex = 0;
         let thresholds = { p25: 0, p75: 0, max: 0 };
         let currentView = 'home'; // 'home' or 'stats'
+        const STATS_RANGE_KEY = 'noodle_meter_stats_range';
+        let statsRange = localStorage.getItem(STATS_RANGE_KEY) === 'all' ? 'all' : 'recent';
 
         // Confetti system
         const confettiCanvas = document.getElementById('confetti');
@@ -880,12 +901,12 @@
         });
 
         // Activity grid (GitHub-style contribution graph)
-        function buildActivityGrid() {
-            if (data.length === 0) return '';
+        function buildActivityGrid(entries) {
+            if (entries.length === 0) return '';
 
             // Build date→entry lookup (date key format: YYYY-MM-DD)
             const dateMap = {};
-            data.forEach(d => {
+            entries.forEach(d => {
                 const dt = new Date(d.date);
                 const key = dt.getFullYear() + '-' +
                     String(dt.getMonth() + 1).padStart(2, '0') + '-' +
@@ -894,8 +915,8 @@
             });
 
             // Determine date range: Monday on or before first entry through Sunday on or after today/last entry
-            const firstDate = new Date(data[0].date);
-            const lastDate = new Date(data[data.length - 1].date);
+            const firstDate = new Date(entries[0].date);
+            const lastDate = new Date(entries[entries.length - 1].date);
             const today = new Date();
             const endRef = lastDate > today ? lastDate : today;
 
@@ -953,9 +974,13 @@
 
             // Month labels in row 1, positioned at the week column where each month starts
             const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-            const monthLabelsHtml = monthPositions.map(mp =>
-                `<div class="activity-month-label" style="grid-row:1;grid-column:${mp.col + 2}">${monthNames[mp.month]}</div>`
-            ).join('');
+            // A partial first month can start a column or two before the next, which
+            // would overprint both labels ("JanFeb"); drop the one that's crowded out.
+            const monthLabelsHtml = monthPositions
+                .filter((mp, i) => i + 1 >= monthPositions.length || monthPositions[i + 1].col - mp.col >= 3)
+                .map(mp =>
+                    `<div class="activity-month-label" style="grid-row:1;grid-column:${mp.col + 2}">${monthNames[mp.month]}</div>`
+                ).join('');
 
             // DOW labels in column 1
             const dowNames = ['Mon','','Wed','','Fri','',''];
@@ -981,21 +1006,18 @@
             document.getElementById('view-toggle').innerHTML = '&#x1F3E0;'; // Home icon
             document.getElementById('view-toggle').title = 'Back to daily view';
 
-            const totalMiles = data.reduce((sum, d) => sum + d.distance, 0);
-            const avgMiles = totalMiles / data.length;
-            const maxMiles = Math.max(...data.map(d => d.distance));
-
-            // Only histogram the recent window. Pooling every night since January mixes
-            // long winter nights with short summer ones -- two populations ~4 miles apart --
-            // which smears the distribution into a shapeless lump.
-            const histCutoff = new Date(data[data.length - 1].date);
-            histCutoff.setDate(histCutoff.getDate() - Stats.HISTOGRAM_WINDOW_DAYS);
-            const recent = data.filter(d => new Date(d.date) >= histCutoff);
-            const histData = recent.length >= Stats.MIN_WINDOW_SAMPLES ? recent : data;
+            // Recent (the default) scopes everything to the last 90 days. The all-time
+            // histogram pools long winter nights with short summer ones -- two
+            // populations ~4 miles apart -- so it reads as a lump; it's there for the
+            // long view, not as the primary chart.
+            const histData = Stats.statsEntries(data, statsRange);
+            const totalMiles = histData.reduce((sum, d) => sum + d.distance, 0);
+            const avgMiles = totalMiles / histData.length;
             const histThresholds = Stats.windowThresholds(histData.map(d => d.distance));
+            const maxMiles = histThresholds.max;
 
-            // Bucket colours are judged against the same window, but red stays reserved for
-            // the all-time record -- so it only shows if the record day falls inside the window.
+            // Bucket colours are judged against the same range, but red stays reserved for
+            // the all-time record -- so it only shows if the record day falls inside the range.
             function getBucketTier(bucketMid) {
                 if (bucketMid >= thresholds.max) return 'record';
                 if (bucketMid > histThresholds.p75) return 'high';
@@ -1039,19 +1061,22 @@
 
             document.getElementById('content').innerHTML = `
                 <div class="stats-view">
-                    <div class="stats-title">All-Time Stats</div>
+                    <div class="range-toggle" role="group" aria-label="Stats range">
+                        <button class="range-btn${statsRange === 'recent' ? ' active' : ''}" data-range="recent" aria-pressed="${statsRange === 'recent'}">Last ${Stats.HISTOGRAM_WINDOW_DAYS} days</button>
+                        <button class="range-btn${statsRange === 'all' ? ' active' : ''}" data-range="all" aria-pressed="${statsRange === 'all'}">All time</button>
+                    </div>
                     <div class="total-miles">${totalMiles.toFixed(1)}</div>
                     <div class="total-label">total miles</div>
 
                     <div class="histogram">${histogramBars}</div>
                     <div class="histogram-labels">${histogramLabels}</div>
-                    <div class="histogram-title">miles per day &middot; last ${histData.length} days</div>
+                    <div class="histogram-title">miles per day &middot; ${statsRange === 'all' ? 'all' : 'last'} ${histData.length} days</div>
 
-                    ${buildActivityGrid()}
+                    ${buildActivityGrid(histData)}
 
                     <div class="stats-summary">
                         <div class="stat-item">
-                            <div class="stat-value">${data.length}</div>
+                            <div class="stat-value">${histData.length}</div>
                             <div class="stat-label">days tracked</div>
                         </div>
                         <div class="stat-item">
@@ -1065,6 +1090,15 @@
                     </div>
                 </div>
             `;
+
+            document.querySelectorAll('.range-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (btn.dataset.range === statsRange) return;
+                    statsRange = btn.dataset.range;
+                    localStorage.setItem(STATS_RANGE_KEY, statsRange);
+                    showStatsView();
+                });
+            });
         }
 
         function showHomeView() {

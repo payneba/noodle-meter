@@ -69,6 +69,17 @@
         return allTime;
     }
 
+    // Entries the stats view covers for a range: 'recent' is the last
+    // HISTOGRAM_WINDOW_DAYS ending at the latest entry (falling back to all
+    // history when that window is too sparse to chart); 'all' is everything.
+    function statsEntries(data, range) {
+        if (range === 'all' || data.length === 0) return data;
+        const cutoff = new Date(data[data.length - 1].date);
+        cutoff.setDate(cutoff.getDate() - HISTOGRAM_WINDOW_DAYS);
+        const recent = data.filter(d => new Date(d.date) >= cutoff);
+        return recent.length >= MIN_WINDOW_SAMPLES ? recent : data;
+    }
+
     // Distance per wheel revolution for a pet: explicit calibration override,
     // else derived from the wheel diameter (63360 inches per mile).
     function milesPerRev(pet) {
@@ -120,6 +131,7 @@
         windowThresholds,
         trailingDistances,
         computeTiers,
+        statsEntries,
         milesPerRev,
         normalizeRows
     };

@@ -226,13 +226,23 @@ this update — with data through 2026-09-04 the residual-trend conclusion flipp
 from not-significant to significant (see above); re-run
 `analysis/photoperiod_model.py` for current numbers.
 
+### Stats view range
+
+A **Last 90 days / All time** toggle at the top of the stats view scopes every
+figure on it — total miles, histogram, activity grid, days tracked, average and
+best day (`Stats.statsEntries`). The choice is remembered per browser
+(`localStorage`, key `noodle_meter_stats_range`) and defaults to the recent range.
+If the last 90 days hold fewer than `MIN_WINDOW_SAMPLES` entries, the recent range
+falls back to all history.
+
 ### Histogram
 
-Scoped to the last 90 days (`HISTOGRAM_WINDOW_DAYS`) and coloured against that
-window's own thresholds. Pooling all history mixes long winter nights with short
-summer ones — two populations several miles apart — which smears the distribution
-into a shapeless lump. Red is reserved for the all-time record, so the top bucket
-only turns red if the record day falls inside the window.
+Defaults to the last 90 days (`HISTOGRAM_WINDOW_DAYS`) and is coloured against the
+selected range's own thresholds. Pooling all history mixes long winter nights with
+short summer ones — two populations several miles apart — which smears the
+distribution into a shapeless lump, which is why recent is the default and all-time
+is opt-in. Red is reserved for the all-time record, so the top bucket only turns red
+if the record day falls inside the range.
 
 ### Pet switching
 

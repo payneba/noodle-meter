@@ -64,6 +64,20 @@ async function run(h) {
         h.assertEqual(data[10].tier, 'medium', 'mid-pack night is medium');
     });
 
+    h.test('statsEntries recent keeps only the trailing window', () => {
+        const data = mkData(Array(120).fill(1), '1/1/2026');
+        const recent = Stats.statsEntries(data, 'recent');
+        h.assertEqual(recent.length, 91, 'window days plus the latest entry');
+        h.assertEqual(recent[recent.length - 1], data[119], 'ends at latest entry');
+        h.assertEqual(Stats.statsEntries(data, 'all').length, 120, 'all keeps everything');
+    });
+
+    h.test('statsEntries recent falls back to all history when sparse', () => {
+        const data = mkData([1, 2, 3], '1/1/2026');
+        h.assertEqual(Stats.statsEntries(data, 'recent').length, 3, 'sparse fallback');
+        h.assertEqual(Stats.statsEntries([], 'recent').length, 0, 'empty stays empty');
+    });
+
     h.test('milesPerRev from wheel diameter', () => {
         h.assertClose(Stats.milesPerRev({ wheelDiameterInches: 9 }),
             Math.PI * 9 / 63360, 1e-12, 'diameter-derived');
