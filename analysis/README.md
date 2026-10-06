@@ -1,6 +1,28 @@
 # Is Noodle slowing down?
 
-> **Update (2026-09-04):** The write-up below is a snapshot of 173 nights through 2026-07-13. With data through 2026-09-04 (226 nights), the residual-trend conclusion below has flipped: it is now small but statistically significant (−30 ± 5 revs/day) — most of the decline is still photoperiod (~86%), but there is now evidence of a modest genuine slowdown on top of it. See [report.html](report.html) or re-run `photoperiod_model.py` for current numbers.
+> **Update (2026-10-06): the autumn test failed — she is genuinely slowing down.**
+> The write-up below is a snapshot of 173 nights through 2026-07-13. With 258 nights
+> through 2026-10-06, the lengthening nights did *not* bring revs back:
+>
+> - Trained on Jan–Jun, the dark-window model over-predicts by ~3,500 revs/night in
+>   August and ~6,400 in September. September's nights were as long as March's, but
+>   revs were ~7,700 lower.
+> - At matched darkness, late-season nights run 2,600–5,400 revs below spring ones
+>   (e.g. 8.0–8.4h dark: 20,605 in spring vs 15,160 in Jul–Oct).
+> - Autumn breaks the confounding between darkness and time, and both now matter:
+>   **residual trend −31.8 ± 3.1 revs/day** (t = −10; ≈ −950 revs/month, −4.8%/month
+>   in a log model) alongside **~2,300 revs per dark hour** — roughly half the earlier
+>   ~4,500, which was partly absorbing the trend. Photoperiod now explains ~71% of
+>   the Jan→June drop, not 85%.
+> - The decline looks linear since January: quadratic, log and solstice-hinge trends
+>   fit no better.
+> - Still holding: the weekly commute rhythm (+2,942 revs, t = 5.7) and the DST step.
+>
+> Next test: the **1 Nov fall-back** shortens the dark window ~1 hour overnight; a
+> step down then would confirm the photoperiod effect is still live. Early October is
+> running ~1,500 above even the trend model (6 nights — possibly noise, possibly a
+> lagged seasonal response). See [report.html](report.html) or re-run
+> `photoperiod_model.py` for current numbers.
 
 **Short answer: probably not.** The long-run decline in revolutions per night is
 almost entirely explained by the shrinking dark window between lights-out and
