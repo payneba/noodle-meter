@@ -161,6 +161,40 @@ async function run(h) {
         h.assertEqual(out[0].revs, 999, 'later-timestamped correction wins despite appearing first in sheet order');
     });
 
+    h.test('histogramBuckets keeps 1-mile buckets when the range is wide', () => {
+        const b = Stats.histogramBuckets([2.3, 4.1, 5.9, 7.2, 9.6, 3.0]);
+        h.assertEqual(b.step, 1, 'step');
+        h.assertEqual(b.buckets.length, 8, 'buckets 2..9');
+        h.assertEqual(b.buckets[0].min, 2, 'first bucket min');
+        h.assertEqual(b.buckets[7].max, 10, 'last bucket max');
+        h.assertEqual(b.buckets.reduce((s, x) => s + x.count, 0), 6, 'every entry counted');
+    });
+
+    h.test('histogramBuckets splits buckets when the range is narrow', () => {
+        // ~1.5 mi spread: 1-mile buckets would give only 2 bars.
+        const b = Stats.histogramBuckets([0.62, 0.95, 1.1, 1.4, 1.8, 2.3]);
+        h.assertEqual(b.step, 0.25, 'step');
+        h.assertEqual(b.buckets[0].min, 0.5, 'first bucket min');
+        h.assertEqual(b.buckets.length, 8, 'buckets 0.5..2.25');
+        h.assertEqual(b.buckets[3].count, 1, '1.25-1.5 holds 1.4');
+        h.assertEqual(b.buckets.reduce((s, x) => s + x.count, 0), 6, 'every entry counted');
+    });
+
+    h.test('histogramBuckets falls to 0.1 mi and avoids float drift', () => {
+        const b = Stats.histogramBuckets([0.3, 0.35, 0.5, 0.7]);
+        h.assertEqual(b.step, 0.1, 'step');
+        h.assertEqual(b.buckets[0].min, 0.3, '0.3 lands in its own bucket, not 0.2');
+        h.assertEqual(b.buckets[0].count, 2, '0.3 and 0.35');
+        h.assertEqual(b.buckets.length, 5, 'buckets 0.3..0.7');
+    });
+
+    h.test('histogramBuckets counts a max that sits exactly on a boundary', () => {
+        const b = Stats.histogramBuckets([1, 2, 3, 4, 5, 6, 7, 8]);
+        h.assertEqual(b.step, 1, 'step');
+        h.assertEqual(b.buckets.length, 8, 'top bucket is 8-9');
+        h.assertEqual(b.buckets.reduce((s, x) => s + x.count, 0), 8, 'max day not dropped');
+    });
+
     h.test('normalizeRows same-day resubmit ordering is timestamp-based, not array-order-based', () => {
         const out = Stats.normalizeRows([
             { timestamp: '2026-01-05T16:00:00Z', revs: 200, date: '' },

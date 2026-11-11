@@ -244,6 +244,11 @@ distribution into a shapeless lump, which is why recent is the default and all-t
 is opt-in. Red is reserved for the all-time record, so the top bucket only turns red
 if the record day falls inside the range.
 
+Buckets are 1 mile wide unless that gives fewer than 8 bars
+(`Stats.histogramBuckets`), in which case they split to 0.5, 0.25 or 0.1 mile —
+the widest step that reaches 8. Noodle (1–12 mi) stays at 1 mile; Murphy (0–5 mi)
+gets half-mile buckets. Past 10 bars, only every other bar gets an axis label.
+
 ### Pet switching
 
 - **URL scheme**: `?pet=<slug>`. Resolution order: URL param → last-viewed

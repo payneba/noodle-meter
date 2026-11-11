@@ -1025,22 +1025,8 @@
                 return 'low';
             }
 
-            // Create histogram buckets (1-mile each)
-            const bucketSize = 1;
-            const minMiles = Math.min(...histData.map(d => d.distance));
-            const minBucket = Math.floor(minMiles / bucketSize) * bucketSize;
-            const maxBucket = Math.ceil(histThresholds.max / bucketSize) * bucketSize;
-            const buckets = [];
-            for (let i = minBucket; i < maxBucket; i += bucketSize) {
-                buckets.push({ min: i, max: i + bucketSize, count: 0 });
-            }
-
-            histData.forEach(d => {
-                const bucketIndex = Math.floor(d.distance / bucketSize) - Math.floor(minBucket / bucketSize);
-                if (bucketIndex >= 0 && bucketIndex < buckets.length) {
-                    buckets[bucketIndex].count++;
-                }
-            });
+            // 1-mile buckets, split finer when the range is too narrow for that
+            const { buckets } = Stats.histogramBuckets(histData.map(d => d.distance));
 
             const maxCount = Math.max(...buckets.map(b => b.count));
 
@@ -1055,8 +1041,10 @@
                 </div>`;
             }).join('');
 
-            const histogramLabels = buckets.map(b => {
-                return `<div class="histogram-label">${b.min}</div>`;
+            // Fractional labels ("1.25") crowd narrow bars; past 10 buckets label every other one
+            const labelEvery = buckets.length > 10 ? 2 : 1;
+            const histogramLabels = buckets.map((b, i) => {
+                return `<div class="histogram-label">${i % labelEvery === 0 ? b.min : ''}</div>`;
             }).join('');
 
             document.getElementById('content').innerHTML = `

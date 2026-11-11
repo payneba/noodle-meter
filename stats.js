@@ -80,6 +80,37 @@
         return recent.length >= MIN_WINDOW_SAMPLES ? recent : data;
     }
 
+    // Histogram buckets for a set of daily distances. 1-mile buckets suit a pet
+    // running 1-12 miles a night but leave a pet running 0-5 with a handful of
+    // bars, so use the widest step from HISTOGRAM_STEPS that still
+    // yields MIN_HISTOGRAM_BUCKETS. Buckets are [min, max); the top bucket is the
+    // one holding the max, so a max on a boundary still counts. Bucket edges come
+    // from integer indices to keep 0.1-mile steps free of float drift.
+    const HISTOGRAM_STEPS = [1, 0.5, 0.25, 0.1];
+    const MIN_HISTOGRAM_BUCKETS = 8;
+    const EPS = 1e-9;
+
+    function histogramBuckets(distances) {
+        const lo = Math.min(...distances);
+        const hi = Math.max(...distances);
+        let step, first, last;
+        for (step of HISTOGRAM_STEPS) {
+            first = Math.floor(lo / step + EPS);
+            last = Math.floor(hi / step + EPS);
+            if (last - first + 1 >= MIN_HISTOGRAM_BUCKETS) break;
+        }
+        const decimals = step >= 1 ? 0 : step >= 0.5 ? 1 : 2;
+        const edge = i => Number((i * step).toFixed(decimals));
+        const buckets = [];
+        for (let i = first; i <= last; i++) {
+            buckets.push({ min: edge(i), max: edge(i + 1), count: 0 });
+        }
+        distances.forEach(d => {
+            buckets[Math.floor(d / step + EPS) - first].count++;
+        });
+        return { step, buckets };
+    }
+
     // Distance per wheel revolution for a pet: explicit calibration override,
     // else derived from the wheel diameter (63360 inches per mile).
     function milesPerRev(pet) {
@@ -132,6 +163,7 @@
         trailingDistances,
         computeTiers,
         statsEntries,
+        histogramBuckets,
         milesPerRev,
         normalizeRows
     };
